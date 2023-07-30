@@ -156,12 +156,21 @@ def upload(file_path):
         ])
         uploaded = {
             'file_name': os.path.basename(file_path),
-            'download_urls': uploader.get_download_urls(),
+            'download_urls': remove_empty_tuples(uploader.get_download_urls()),
         }
+
         send_upload_complete_request(uploaded)
     except Exception as e:
         print(e)
         # Handle the error if needed
+
+def remove_empty_tuples(lst):
+    # Remove tuples that contain all None elements
+    lst = [tpl for tpl in lst if not all(elem is None for elem in tpl)]
+
+    if not lst:
+        raise Exception('List is Empty')
+    return lst
 
 def send_upload_complete_request(uploaded):
     # Placeholder function
