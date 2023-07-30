@@ -1,4 +1,4 @@
-# Hooked-Forumist Flask App
+# Hooked-Forumist
 
 Hooked-Forumist is a Flask application that provides a webhook endpoint for uploading files to multiple file hosting services concurrently. It allows users to upload a file and automatically distributes it to different file hosting platforms, such as Pixeldrain and Baidupan. The application provides JSON responses for various endpoints.
 

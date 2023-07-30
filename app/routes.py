@@ -1,10 +1,8 @@
 from flask import request, jsonify
+import threading
+
 from app import app
-from app.file_uploader import (
-    PixeldrainHandler,
-    BaidupanHandler,
-    FileUploader
-)
+from app.file_uploader import upload
 
 @app.route('/', methods=['GET'])
 def greet():
@@ -24,16 +22,7 @@ def page_not_found(e):
 def handle_webhook():
     file_path = request.json.get('file_path')
     if file_path:
-        uploader = FileUploader(file_path)
-        try:
-            uploader.upload_to_multiple([
-                BaidupanHandler,
-                PixeldrainHandler,
-            ])
-            return jsonify({"success": True,
-                            "value": uploader.get_download_urls()})
-        except Exception as e:
-            print(e)
-            return jsonify({"success": False, "message": "Server Error", "value": None}), 400
+        threading.Thread(target=upload, args=(file_path,)).start()
+        return jsonify({"success": True, "message": "File added to upload"})
     else:
         return jsonify({"success": False, "message": "Invalid request", "value": None}), 400

@@ -1,5 +1,4 @@
-import os, random, string
-import threading
+import os, random, string, threading, hashlib
 import requests
 from abc import ABC, abstractmethod
 
@@ -18,6 +17,18 @@ class FileHostHandler(ABC):
     def get_password(self):
         pass
 
+    def hash_filename(self, filename):
+        # Extract the file extension
+        _, ext = os.path.splitext(filename)
+
+        # Compute the hash of the filename without the extension
+        hasher = hashlib.sha256()
+        hasher.update(os.path.splitext(filename)[0].encode('utf-8'))
+        hashed_name = hasher.hexdigest()
+
+        # Concatenate the hashed name with the original file extension
+        return hashed_name + ext
+
 class PixeldrainHandler(FileHostHandler):
     BASE_URL = 'https://pixeldrain.com/api'
     UPLOAD_URL = BASE_URL + '/file/{name}'
@@ -32,8 +43,9 @@ class PixeldrainHandler(FileHostHandler):
                 # Send a PUT request to API endpoint
                 # Note: Do not use 'files' attribute as PUT endpoint does
                 # not accept multipart encoding files
+                hashed_name = self.hash_filename(os.path.basename(file.name))
                 response = self.session.put(
-                    self.UPLOAD_URL.format(name=os.path.basename(file.name)),
+                    self.UPLOAD_URL.format(name=hashed_name),
                     data=file)
 
                 if response.status_code == 201:
@@ -82,8 +94,9 @@ class BaidupanHandler(FileHostHandler):
 
         try:
             with open(file_path, 'rb') as file:
+                hashed_name = self.hash_filename(os.path.basename(file.name))
                 remote_path = os.path.join(
-                    self.REMOTE_PATH_BASE, os.path.basename(file_path)
+                    self.REMOTE_PATH_BASE, hashed_name
                 )
                 # Upload the file to remote path
                 self.bd.upload_file(file, remote_path)
@@ -133,3 +146,30 @@ class FileUploader:
 
     def get_download_urls(self):
         return self.uploaded if self.uploaded else None
+
+def upload(file_path):
+    uploader = FileUploader(file_path)
+    try:
+        uploader.upload_to_multiple([
+            BaidupanHandler,
+            PixeldrainHandler,
+        ])
+        uploaded = {
+            'file_name': os.path.basename(file_path),
+            'download_urls': uploader.get_download_urls(),
+        }
+        send_upload_complete_request(uploaded)
+    except Exception as e:
+        print(e)
+        # Handle the error if needed
+
+def send_upload_complete_request(uploaded):
+    # Placeholder function
+    print(uploaded)
+    # url = 'https://example.com/upload-complete'
+    # try:
+    #     response = requests.post(url, json=download_urls)
+    #     if response.status_code != 200:
+    #         print(f"Failed to send upload complete request. Status code: {response.status_code}")
+    # except requests.exceptions.RequestException as e:
+    #     print(f"Failed to send upload complete request: {e}")
