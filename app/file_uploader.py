@@ -13,10 +13,6 @@ class FileHostHandler(ABC):
     def get_download_url(self):
         pass
 
-    @abstractmethod
-    def get_password(self):
-        pass
-
     def hash_filename(self, filename):
         # Extract the file extension
         _, ext = os.path.splitext(filename)
@@ -65,9 +61,6 @@ class PixeldrainHandler(FileHostHandler):
         else:
             return None
 
-    def get_password(self):
-        return None
-
 class BaidupanHandler(FileHostHandler):
     BDUSS = os.environ.get("BDUSS")
     STOKEN = os.environ.get("STOKEN")
@@ -76,7 +69,6 @@ class BaidupanHandler(FileHostHandler):
 
     def __init__(self):
         self.link = None
-        self.password = None
         self.bd = BaiduPCSApi(bduss=self.BDUSS, stoken=self.STOKEN)
 
     def _generate_share_pwd(self, length=4):
@@ -105,20 +97,19 @@ class BaidupanHandler(FileHostHandler):
                 share_file = self.bd.share(remote_path,
                                            password=self._generate_share_pwd())
                 
-                self.link, self.password = share_file.url, share_file.password
+                link, password = share_file.url, share_file.password
 
                 # Check if got link and password
-                if not self.link or not self.password:
+                if not link or not password:
                     raise Exception('Failed to get share link and password')
+                
+                self.link = f'{share_file.url}?pwd={share_file.password}'
         except IOError as e:
             print(f"Failed to read the file: {e}")
             raise(e)
 
     def get_download_url(self):
         return self.link if self.link else None
-
-    def get_password(self):
-        return self.password if self.password else None
     
 class FileUploader:
     def __init__(self, file_path):
@@ -130,7 +121,7 @@ class FileUploader:
         handler = Handler()
         handler.upload_file(self.file_path)
 
-        self.uploaded.append((handler.get_download_url(), handler.get_password()))
+        self.uploaded.append(handler.get_download_url())
 
     def upload_to_multiple(self, Handlers):
         # Create a thread for each file host and start the uploads concurrently
@@ -156,21 +147,14 @@ def upload(file_path):
         ])
         uploaded = {
             'file_name': os.path.basename(file_path),
-            'download_urls': remove_empty_tuples(uploader.get_download_urls()),
+            'file_size': os.path.getsize(file_path),
+            'download_urls': list(filter(None, uploader.get_download_urls())),
         }
 
         send_upload_complete_request(uploaded)
     except Exception as e:
         print(e)
         # Handle the error if needed
-
-def remove_empty_tuples(lst):
-    # Remove tuples that contain all None elements
-    lst = [tpl for tpl in lst if not all(elem is None for elem in tpl)]
-
-    if not lst:
-        raise Exception('List is Empty')
-    return lst
 
 def send_upload_complete_request(uploaded):
     # Placeholder function
