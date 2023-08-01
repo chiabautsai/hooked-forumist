@@ -1,4 +1,4 @@
-import os, random, string, threading, hashlib
+import os, random, string, threading, hashlib, re
 import requests
 from abc import ABC, abstractmethod
 
@@ -141,13 +141,15 @@ class FileUploader:
 def upload(file_path):
     uploader = FileUploader(file_path)
     try:
+        file_name = os.path.basename(file_path)
         uploader.upload_to_multiple([
             BaidupanHandler,
             PixeldrainHandler,
         ])
         uploaded = {
-            'file_name': os.path.basename(file_path),
+            'file_name': file_name,
             'file_size': os.path.getsize(file_path),
+            'pre_name': if_scn_release(file_name),
             'download_urls': list(filter(None, uploader.get_download_urls())),
         }
 
@@ -155,6 +157,12 @@ def upload(file_path):
     except Exception as e:
         print(e)
         # Handle the error if needed
+
+def if_scn_release(file_name):
+    pattern = r"\[.*?\]_(.*?-\d{4}-[A-Za-z0-9]+\.(?:tar|zip|rar|7z))"
+    matched_pre_name = re.search(pattern, file_name)
+
+    return matched_pre_name.group(1) if matched_pre_name else None
 
 def send_upload_complete_request(uploaded):
     # Placeholder function
