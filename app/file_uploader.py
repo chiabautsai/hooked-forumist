@@ -1,4 +1,4 @@
-import os, random, string, threading, hashlib, re
+import os, random, string, threading, hashlib, re, json
 import requests
 from abc import ABC, abstractmethod
 
@@ -165,12 +165,11 @@ def if_scn_release(file_name):
     return matched_pre_name.group(1) if matched_pre_name else None
 
 def send_upload_complete_request(uploaded):
-    # Placeholder function
-    print(uploaded)
-    # url = 'https://example.com/upload-complete'
-    # try:
-    #     response = requests.post(url, json=download_urls)
-    #     if response.status_code != 200:
-    #         print(f"Failed to send upload complete request. Status code: {response.status_code}")
-    # except requests.exceptions.RequestException as e:
-    #     print(f"Failed to send upload complete request: {e}")
+    print(json.dumps(uploaded, indent=4))
+    url = os.environ.get("API_ENDPOINT")
+    try:
+        response = requests.post(url, json=uploaded)
+        if response.status_code != 200:
+            print(f"Failed to send upload complete request. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to send upload complete request: {e}")

@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve hooked_forumist
+After=network.target
+
+[Service]
+User=your_username
+Group=your_group
+WorkingDirectory=/path/to/your/app
+ExecStart=/path/to/venv/bin/gunicorn app:app --workers 4
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
