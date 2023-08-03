@@ -173,6 +173,9 @@ def upload(file_path):
         }
 
         send_upload_complete_request(uploaded)
+
+        # Delete file after upload
+        os.remove(file_path)
     except Exception as e:
         print(e)
         # Handle the error if needed
