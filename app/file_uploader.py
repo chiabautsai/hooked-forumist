@@ -2,6 +2,8 @@ import os, random, string, threading, hashlib, re, json
 import requests
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
+from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
+from tqdm import tqdm
 
 from baidupcs_py.baidupcs import BaiduPCSApi
 
@@ -39,13 +41,37 @@ class PixeldrainHandler(FileHostHandler):
     def upload_file(self, file_path):
         try:
             with open(file_path, 'rb') as file:
-                # Send a PUT request to API endpoint
-                # Note: Do not use 'files' attribute as PUT endpoint does
-                # not accept multipart encoding files
+                # Get the file size for tqdm progress bar
+                file_size = os.path.getsize(file_path)
+
+                # Create the MultipartEncoder with the file data
                 hashed_name = self.hash_filename(os.path.basename(file.name))
+                multipart_data = MultipartEncoder(fields={'file': (hashed_name, file, 'application/octet-stream')})
+
+                # Custom callback function to track progress
+                def progress_callback(monitor):
+                    progress_bar.n = monitor.bytes_read
+                    progress_bar.refresh()
+
+                # Use MultipartEncoderMonitor to wrap the MultipartEncoder and track progress
+                monitor = MultipartEncoderMonitor(multipart_data, progress_callback)
+
+                # Set up tqdm progress bar
+                progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, desc='Uploading', dynamic_ncols=True)
+
+                # Send a PUT request to API endpoint with tqdm to display progress
                 response = self.session.put(
                     self.UPLOAD_URL.format(name=hashed_name),
-                    data=file)
+                    data=monitor,  # Use the monitor instead of the file
+                    headers={
+                        'Content-Type': multipart_data.content_type,
+                        'Content-Length': str(file_size),
+                        'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'
+                    }
+                )
+
+                # Close the tqdm progress bar
+                progress_bar.close()
 
                 if response.status_code == 201:
                     response_json = response.json()
@@ -56,7 +82,7 @@ class PixeldrainHandler(FileHostHandler):
 
         except IOError as e:
             print(f"Failed to read the file: {e}")
-            raise(e)
+            raise e
 
     def get_download_url(self):
         if self.file_id:
@@ -89,12 +115,22 @@ class BaidupanHandler(FileHostHandler):
 
         try:
             with open(file_path, 'rb') as file:
-                hashed_name = self.hash_filename(os.path.basename(file.name))
-                remote_path = os.path.join(
-                    self.REMOTE_PATH_BASE, hashed_name
-                )
-                # Upload the file to remote path
-                self.bd.upload_file(file, remote_path)
+                file_size = os.path.getsize(file_path)
+
+                # Set up tqdm progress bar
+                with tqdm(total=file_size, unit='B', unit_scale=True, desc='Uploading', dynamic_ncols=True) as progress_bar:
+                    # Define the callback function to update the progress bar
+                    def progress_callback(monitor):
+                        progress_bar.update(monitor.bytes_read - progress_bar.n)
+
+                    # Use requests_toolbelt's MultipartEncoderMonitor to track progress
+                    hashed_name = self.hash_filename(os.path.basename(file.name))
+                    remote_path = os.path.join(self.REMOTE_PATH_BASE, hashed_name)
+                    self.bd.upload_file(
+                        file,
+                        remote_path,
+                        callback=progress_callback  # Pass the progress_callback to the upload_file method
+                    )
 
                 # Get download link and password
                 share_file = self.bd.share(remote_path,
