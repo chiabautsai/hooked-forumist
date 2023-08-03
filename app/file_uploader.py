@@ -1,8 +1,11 @@
 import os, random, string, threading, hashlib, re, json
 import requests
 from abc import ABC, abstractmethod
+from dotenv import load_dotenv
 
 from baidupcs_py.baidupcs import BaiduPCSApi
+
+load_dotenv()
 
 class FileHostHandler(ABC):
     @abstractmethod
