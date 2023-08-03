@@ -2,8 +2,8 @@ import os, random, string, threading, hashlib, re, json
 import requests
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
-from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 from tqdm import tqdm
+from tqdm.utils import CallbackIOWrapper
 
 from baidupcs_py.baidupcs import BaiduPCSApi
 
@@ -41,48 +41,28 @@ class PixeldrainHandler(FileHostHandler):
     def upload_file(self, file_path):
         try:
             with open(file_path, 'rb') as file:
-                # Get the file size for tqdm progress bar
-                file_size = os.path.getsize(file_path)
-
-                # Create the MultipartEncoder with the file data
+                # Get the file size and name
+                file_size = os.stat(file_path).st_size
+                # Send a PUT request to API endpoint
+                # Note: Do not use 'files' attribute as PUT endpoint does
+                # not accept multipart encoding files
                 hashed_name = self.hash_filename(os.path.basename(file.name))
-                multipart_data = MultipartEncoder(fields={'file': (hashed_name, file, 'application/octet-stream')})
+                with tqdm(total=file_size, unit="B", unit_scale=True, desc='Uploading') as t:
+                    wrapped_file = CallbackIOWrapper(t.update, file, "read")
+                    response = self.session.put(
+                        self.UPLOAD_URL.format(name=hashed_name),
+                        data=wrapped_file)
 
-                # Custom callback function to track progress
-                def progress_callback(monitor):
-                    progress_bar.n = monitor.bytes_read
-                    progress_bar.refresh()
-
-                # Use MultipartEncoderMonitor to wrap the MultipartEncoder and track progress
-                monitor = MultipartEncoderMonitor(multipart_data, progress_callback)
-
-                # Set up tqdm progress bar
-                progress_bar = tqdm(total=file_size, unit='B', unit_scale=True, desc='Uploading', dynamic_ncols=True)
-
-                # Send a PUT request to API endpoint with tqdm to display progress
-                response = self.session.put(
-                    self.UPLOAD_URL.format(name=hashed_name),
-                    data=monitor,  # Use the monitor instead of the file
-                    headers={
-                        'Content-Type': multipart_data.content_type,
-                        'Content-Length': str(file_size),
-                        'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'
-                    }
-                )
-
-                # Close the tqdm progress bar
-                progress_bar.close()
-
-                if response.status_code == 201:
-                    response_json = response.json()
-                    self.file_id = response_json['id']
-                    return True
-                else:
-                    raise Exception(f'Error Response: {response.content}')
+                    if response.status_code == 201:
+                        response_json = response.json()
+                        self.file_id = response_json['id']
+                        return True
+                    else:
+                        raise Exception(f'Error Response: {response.content}')
 
         except IOError as e:
             print(f"Failed to read the file: {e}")
-            raise e
+            raise(e)
 
     def get_download_url(self):
         if self.file_id:
