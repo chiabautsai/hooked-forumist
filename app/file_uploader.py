@@ -178,7 +178,7 @@ def upload(file_path):
         # Handle the error if needed
 
 def if_scn_release(file_name):
-    pattern = r"\[.*?\]_(.*?-\d{4}-[A-Za-z0-9]+\.(?:tar|zip|rar|7z))"
+    pattern = r"\[.*?\]_(.*?-\d{4}-[A-Za-z0-9]+)\.(?:tar|zip|rar|7z)"
     matched_pre_name = re.search(pattern, file_name)
 
     return matched_pre_name.group(1) if matched_pre_name else None
