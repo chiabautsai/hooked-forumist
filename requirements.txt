@@ -3,3 +3,4 @@ Flask
 BaiduPCS-Py
 gunicorn
 python-dotenv
+tqdm
